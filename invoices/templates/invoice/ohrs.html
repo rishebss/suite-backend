@@ -1,0 +1,45 @@
+{% extends "invoice/base_invoice.html" %}
+
+{% block extra_fields %}
+  {# OHRS (Online Hotel Reservation System) — renders room / check-in / check-out / guest fields #}
+  {% if invoice.extra_data %}
+    <div class="extra-fields-block">
+      <h4>Accommodation Details</h4>
+      <div class="extra-fields-grid">
+        {% if invoice.extra_data.room_number %}
+          <div class="extra-field">
+            <span class="label">Room No.: </span>
+            <span class="val">{{ invoice.extra_data.room_number }}</span>
+          </div>
+        {% endif %}
+        {% if invoice.extra_data.check_in %}
+          <div class="extra-field">
+            <span class="label">Check-In: </span>
+            <span class="val">{{ invoice.extra_data.check_in }}</span>
+          </div>
+        {% endif %}
+        {% if invoice.extra_data.check_out %}
+          <div class="extra-field">
+            <span class="label">Check-Out: </span>
+            <span class="val">{{ invoice.extra_data.check_out }}</span>
+          </div>
+        {% endif %}
+        {% if invoice.extra_data.guest_name %}
+          <div class="extra-field">
+            <span class="label">Guest Name: </span>
+            <span class="val">{{ invoice.extra_data.guest_name }}</span>
+          </div>
+        {% endif %}
+        {# Render any additional dynamic keys not listed above #}
+        {% for key, value in invoice.extra_data.items %}
+          {% if key not in "room_number,check_in,check_out,guest_name" %}
+            <div class="extra-field">
+              <span class="label">{{ key|title }}: </span>
+              <span class="val">{{ value }}</span>
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

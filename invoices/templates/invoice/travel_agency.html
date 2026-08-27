@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Invoice {{ invoice.invoice_number }}</title>
+  <style>
+    @page { size: A4; margin: 1cm 1.5cm; }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 11px;
+      color: #1a1a1a;
+      line-height: 1.5;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* ---- Header ---- */
+    .header-table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: #1B2B6B;
+    }
+    .header-table td {
+      background-color: #1B2B6B;
+      color: #ffffff;
+      padding: 14px 12px;
+      border: none;
+      vertical-align: middle;
+    }
+    .header-table td.logo-cell { width: 70px; text-align: left; padding-right: 0; }
+    .header-table td.name-cell { text-align: center; padding-left: 0; }
+    .header-table .logo-img { height: 50px; width: auto; }
+    .header-table .logo-placeholder { font-size: 11px; color: #9ab; font-style: italic; }
+    .header-table .company-name {
+      font-size: 24px;
+      font-weight: bold;
+      color: #ffffff;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      font-family: 'Helvetica', 'Arial', sans-serif;
+    }
+
+    /* ---- Address bar ---- */
+    .address-bar {
+      font-size: 10px;
+      color: #333;
+      margin: 10px 0 14px;
+      line-height: 1.8;
+    }
+
+    /* ---- Section header (orange band) ---- */
+    .section-header {
+      background-color: #F0A500;
+      color: #1a1a1a;
+      font-weight: bold;
+      font-size: 11.5px;
+      text-align: center;
+      padding: 6px 10px;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+    }
+
+    /* ---- Two-column key/value table ---- */
+    .info-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 14px;
+      font-size: 11px;
+    }
+    .info-table td {
+      padding: 5px 10px;
+      border: 1px solid #ccc;
+      vertical-align: top;
+    }
+    .info-table td.label { width: 35%; color: #444; }
+    .info-table td.value { width: 65%; }
+
+    /* ---- Booking summary (multi-column) ---- */
+    .booking-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 14px;
+      font-size: 11px;
+    }
+    .booking-table th {
+      padding: 6px 8px;
+      border: 1px solid #ccc;
+      font-weight: bold;
+      text-align: center;
+      background-color: #fff;
+    }
+    .booking-table td {
+      padding: 6px 8px;
+      border: 1px solid #ccc;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    /* ---- Cost breakdown ---- */
+    .cost-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 14px;
+      font-size: 11px;
+    }
+    .cost-table th {
+      padding: 6px 10px;
+      border: 1px solid #ccc;
+      font-weight: bold;
+      text-align: left;
+      background-color: #fff;
+    }
+    .cost-table th.num { text-align: center; }
+    .cost-table th.amt { text-align: right; }
+    .cost-table td {
+      padding: 6px 10px;
+      border: 1px solid #ccc;
+      vertical-align: middle;
+    }
+    .cost-table td.num { text-align: center; }
+    .cost-table td.amt { text-align: right; }
+
+    /* ---- Terms ---- */
+    .terms-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+      font-size: 12px;
+      color: #333;
+    }
+    .terms-table td {
+      padding: 7px 12px;
+      border: 1px solid #ccc;
+      line-height: 1.7;
+    }
+
+    /* ---- Signatory ---- */
+    .signatory-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+      page-break-inside: avoid;
+    }
+    .signatory-table td {
+      border: none;
+      padding: 0;
+      vertical-align: middle;
+    }
+    .signatory-table .sig-label-cell {
+      text-align: left;
+      width: 50%;
+    }
+    .signatory-table .seal-label-cell {
+      text-align: right;
+      width: 50%;
+    }
+    .signatory-table .sig-label {
+      font-size: 12px;
+      font-weight: bold;
+      color: #1a1a1a;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+    .signatory-table .sig-image-cell {
+      text-align: left;
+      padding-top: 2px;
+      width: 50%;
+    }
+    .signatory-table .seal-image-cell {
+      text-align: right;
+      padding-top: 10px;
+      width: 50%;
+    }
+    .signatory-table .sig-image-cell img {
+      height: 55px;
+      width: auto;
+      margin: 4px 0;
+      display: block;
+    }
+    .signatory-table .seal-image-cell img {
+      height: 110px;
+      width: auto;
+      margin: 4px 0;
+      display: block;
+      margin-left: auto;
+    }
+    .signatory-table .sig-company {
+      text-align: center;
+      padding-top: 6px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    /* ---- Bank details footer ---- */
+    .bank-footer {
+      page-break-inside: avoid;
+      margin-top: 12px;
+      border: 1px solid #ccc;
+      font-size: 11px;
+    }
+    .bank-footer .bf-header {
+      background-color: #1B2B6B;
+      color: #fff;
+      font-weight: bold;
+      font-size: 11px;
+      padding: 5px 12px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .bank-footer .bf-body {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 30px;
+      padding: 10px 14px;
+      color: #333;
+      line-height: 1.8;
+    }
+    .bank-footer .bf-item { white-space: nowrap; }
+  </style>
+</head>
+<body>
+
+  <!-- ===================== HEADER ===================== -->
+  <table class="header-table">
+    <tr>
+      <td class="logo-cell">
+        {% if logo_path %}
+          <img class="logo-img" src="{{ logo_path }}" alt="Logo" height="50" style="height:50px;width:auto;">
+        {% else %}
+          <span class="logo-placeholder">Logo</span>
+        {% endif %}
+      </td>
+      <td class="name-cell">
+        <div class="company-name">{% if profile %}{{ profile.company_name }}{% else %}Company Name{% endif %}</div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- ===================== ADDRESS BAR ===================== -->
+  {% if profile %}
+  <div class="address-bar">
+    Registered Address: {{ profile.company_address }}
+    {% if profile.email %} | Email: {{ profile.email }}{% endif %}
+    {% if profile.phone %} | Phone: {{ profile.phone }}{% endif %}
+    {% if profile.website %} | Website: {{ profile.website }}{% endif %}
+  </div>
+  {% endif %}
+
+  <!-- ===================== INVOICE DETAILS ===================== -->
+  <div class="section-header">Invoice Details</div>
+  <table class="info-table">
+    <colgroup><col style="width:35%"><col style="width:65%"></colgroup>
+    <tr><td class="label">Invoice No.</td><td class="value">{{ invoice.invoice_number }}</td></tr>
+    <tr><td class="label">Invoice Date</td><td class="value">{{ invoice.created_at|date:"jS F Y" }}</td></tr>
+    <tr><td class="label">Payment Status</td><td class="value">{{ invoice.extra_data.payment_status|default:"—" }}</td></tr>
+    <tr><td class="label">Payment Date</td><td class="value">{{ invoice.extra_data.payment_date|default:"—" }}</td></tr>
+    <tr><td class="label">Mode of Payment</td><td class="value">{{ invoice.extra_data.payment_method|default:"—" }}</td></tr>
+  </table>
+
+  <!-- ===================== CLIENT DETAILS ===================== -->
+  <div class="section-header">Client Details</div>
+  <table class="info-table">
+    <colgroup><col style="width:35%"><col style="width:65%"></colgroup>
+    <tr><td class="label">Client Name</td><td class="value">{{ invoice.client_name }}</td></tr>
+    <tr><td class="label">Email</td><td class="value">{{ invoice.client_email }}</td></tr>
+    <tr><td class="label">Contact No.</td><td class="value">{{ invoice.extra_data.client_contact|default:"—" }}</td></tr>
+    <tr><td class="label">Booking Reference</td><td class="value">{{ invoice.extra_data.booking_reference|default:"—" }}</td></tr>
+  </table>
+
+  <!-- ===================== BOOKING SUMMARY ===================== -->
+  <div class="section-header">Booking Summary</div>
+  <table class="booking-table">
+    <thead>
+      <tr>
+        <th>Destination</th>
+        <th>Duration</th>
+        <th>Travel Dates</th>
+        <th>Guests</th>
+        <th>Package Type</th>
+        <th>Meal Plan</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>{% if invoice.extra_data.from_location %}{{ invoice.extra_data.from_location }} → {% endif %}{{ invoice.extra_data.destination|default:"—" }}</td>
+        <td>{% if invoice.extra_data.nights %}{{ invoice.extra_data.nights }} Nights / {{ invoice.extra_data.days }} Days{% else %}—{% endif %}</td>
+        <td>{% if invoice.extra_data.travel_from %}{{ invoice.extra_data.travel_from }}{% if invoice.extra_data.travel_to %} – {{ invoice.extra_data.travel_to }}{% endif %}{% else %}—{% endif %}</td>
+        <td>{% if invoice.extra_data.adults %}{{ invoice.extra_data.adults }} Adult{% if invoice.extra_data.children %}, {{ invoice.extra_data.children }} Child{% endif %}{% else %}—{% endif %}</td>
+        <td>{{ invoice.extra_data.package_type|default:"—" }}</td>
+        <td>{{ invoice.extra_data.meal_plan|default:"—" }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ===================== COST BREAKDOWN ===================== -->
+  <div class="section-header">Cost Breakdown</div>
+  <table class="cost-table">
+    <thead>
+      <tr>
+        <th>Particulars</th>
+        <th class="num">Qty</th>
+        <th class="num">Rate (INR)</th>
+        <th class="amt">Amount (INR)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in line_items %}
+      <tr>
+        <td>{{ item.description }}</td>
+        <td class="num">{{ item.quantity }}</td>
+        <td class="num">{{ item.unit_price }}</td>
+        <td class="amt">{{ item.amount }}</td>
+      </tr>
+      {% endfor %}
+      <tr>
+        <td>Additional Services (if any)</td>
+        <td class="num">-</td>
+        <td class="num">-</td>
+        <td class="amt">-</td>
+      </tr>
+      <tr>
+        <td colspan="3"><strong>Total Package Value</strong></td>
+        <td class="amt"><strong>{{ invoice.grand_total }}</strong></td>
+      </tr>
+      <tr>
+        <td colspan="3"><strong>Advance Amount Received</strong></td>
+        <td class="amt"><strong>{{ invoice.extra_data.advance_amount|default:"—" }}</strong></td>
+      </tr>
+      <tr>
+        <td colspan="3"><strong>Balance Payable (Due 10 Days Before Check-in)</strong></td>
+        <td class="amt"><strong>{{ invoice.extra_data.balance_payable|default:"—" }}</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ===================== TERMS & NOTES ===================== -->
+  <div class="section-header">Terms &amp; Notes (Editable Section)</div>
+  <table class="terms-table">
+    <tbody>
+      {% if invoice.extra_data.terms %}
+        {% for term in invoice.extra_data.terms %}
+          <tr><td>- {{ term }}</td></tr>
+        {% endfor %}
+      {% else %}
+        <tr><td>- Advance payment confirms the booking.</td></tr>
+        {% if invoice.extra_data.balance_payable and invoice.extra_data.balance_due_date %}
+          <tr><td>- Balance payment of Rs.{{ invoice.extra_data.balance_payable }} is due by {{ invoice.extra_data.balance_due_date }} (10 days before check-in).</td></tr>
+        {% elif invoice.extra_data.balance_payable %}
+          <tr><td>- Balance payment of Rs.{{ invoice.extra_data.balance_payable }} is due 10 days before check-in.</td></tr>
+        {% endif %}
+        <tr><td>- Package once confirmed is non-refundable as per the company cancellation policy.</td></tr>
+        <tr><td>- Any change in travel dates or number of guests is subject to availability and price revision.</td></tr>
+        <tr><td>- All communication and receipts are issued under {% if profile %}{{ profile.company_name }}{% else %}the company{% endif %}.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  <!-- ===================== SIGNATORY ===================== -->
+  <table class="signatory-table">
+    <tr>
+      <td class="sig-label-cell"><span class="sig-label">Authorized Signatory</span></td>
+      <td class="seal-label-cell"><span class="sig-label">(Seal &amp; Signature)</span></td>
+    </tr>
+    <tr>
+      <td class="sig-image-cell">
+        {% if sig_path %}<img src="{{ sig_path }}" alt="Signature" height="55" style="height:55px;width:auto;">{% endif %}
+      </td>
+      <td class="seal-image-cell">
+        {% if seal_path %}<img class="seal-img" src="{{ seal_path }}" alt="Seal" height="110" style="height:110px;width:auto;">{% endif %}
+      </td>
+    </tr>
+    {% if profile %}
+    <tr>
+      <td colspan="2" class="sig-company">For {{ profile.company_name }}</td>
+    </tr>
+    {% endif %}
+  </table>
+
+  <!-- ===================== BANK DETAILS FOOTER ===================== -->
+  {% if profile and profile.bank_name %}
+  <div class="bank-footer">
+    <div class="bf-header">Payment / Bank Details</div>
+    <div class="bf-body">
+      {% if profile.bank_name %}<span class="bf-item"><strong>Bank:</strong> {{ profile.bank_name }}</span>{% endif %}
+      {% if profile.bank_account %}<span class="bf-item"><strong>A/C No:</strong> {{ profile.bank_account }}</span>{% endif %}
+      {% if profile.bank_ifsc %}<span class="bf-item"><strong>IFSC:</strong> {{ profile.bank_ifsc }}</span>{% endif %}
+      {% if profile.bank_branch %}<span class="bf-item"><strong>Branch:</strong> {{ profile.bank_branch }}</span>{% endif %}
+      {% if profile.gstin %}<span class="bf-item"><strong>GSTIN:</strong> {{ profile.gstin }}</span>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+</body>
+</html>

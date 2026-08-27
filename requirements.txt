@@ -1,0 +1,64 @@
+# Core Framework
+Django>=5.2.12
+djangorestframework>=3.17.1
+djangorestframework_simplejwt>=5.5.1
+drf-nested-routers>=0.95.0
+django-anymail>=10.2
+django-cors-headers>=4.9.0
+django-filter>=25.2
+django-otp>=1.4.0
+
+# WebSockets
+channels>=4.2.0
+channels-redis>=4.2.0
+
+# Database & Infrastructure
+psycopg[binary]
+dj-database-url>=2.3.0
+python-dotenv>=1.2.2
+whitenoise>=6.7.0
+gunicorn>=25.3.0
+
+# Media Storage
+django-cloudinary-storage>=0.3.0
+cloudinary>=1.44.0
+
+# PDF Generation (Stable Safe Duo)
+reportlab>=4.2.2
+xhtml2pdf>=0.2.16
+num2words>=0.5.14
+arabic-reshaper>=3.0.0
+python-bidi>=0.6.7
+
+# Background Tasks
+celery>=5.3.4
+redis>=5.0.1
+
+# Security & Messaging
+cryptography>=44.0.1
+pyHanko>=0.34.1
+pyhanko-certvalidator>=0.30.2
+PyJWT>=2.12.1
+pyotp>=2.9.0
+
+# Utilities
+requests>=2.33.1
+pillow>=12.0.0
+pypdf>=6.10.2
+lxml>=5.3.1
+qrcode>=7.4.2
+python-dateutil>=2.9.0.post0
+prompt_toolkit>=3.0.52
+asgiref>=3.8.1
+click>=8.3.2
+colorama>=0.4.6
+six>=1.17.0
+sqlparse>=0.5.5
+typing_extensions>=4.15.0
+tzdata>=2026.1
+tzlocal>=5.3.1
+urllib3>=2.6.3
+vine>=5.1.0
+wcwidth>=0.6.0
+webencodings>=0.5.1
+openpyxl>=3.1.5
