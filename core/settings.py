@@ -33,7 +33,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = os.getenv(
     "ALLOWED_HOSTS",
-    "localhost,127.0.0.1,hertex-business-backend-production.up.railway.app,mqya9wigzxno-production-ge4vahj7.us-central1.suga.run",
+    "localhost,127.0.0.1,concrete-annabella-revetlhobby-b8ae77a4.koyeb.app",
 ).split(",")
 
 
@@ -83,7 +83,7 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = []
 for origin in os.getenv(
     "CORS_ALLOWED_ORIGINS",
-    "http://localhost:5173,https://bytehive-business-frontend.pages.dev",
+    "http://localhost:5173,https://rishebsuite.netlify.app",
 ).split(","):
     origin = origin.strip()
     if origin:

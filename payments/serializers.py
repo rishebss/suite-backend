@@ -36,6 +36,88 @@ class PaymentSerializer(serializers.ModelSerializer):
             }
         return None
 
+    def validate(self, attrs):
+        crm = (
+            attrs.get("crm")
+            if "crm" in attrs
+            else (self.instance.crm if self.instance else None)
+        )
+        if crm and getattr(crm, "pipeline_id", None):
+            rule = (
+                RecurringPaymentSchedule.objects.filter(
+                    pipeline_id=crm.pipeline_id, status="active"
+                )
+                .order_by("-created_at")
+                .first()
+            )
+            if rule:
+                errors = {}
+                if (
+                    attrs.get("payment_for") is not None
+                    and attrs.get("payment_for") != rule.payment_for
+                ):
+                    errors["payment_for"] = (
+                        f"Must match pipeline rule: '{rule.payment_for}'."
+                    )
+                if attrs.get("amount") is not None and str(attrs.get("amount")) != str(
+                    rule.amount
+                ):
+                    try:
+                        if float(attrs.get("amount")) != float(rule.amount):
+                            errors["amount"] = (
+                                f"Must be ₹{rule.amount} per pipeline rule."
+                            )
+                    except Exception:
+                        errors["amount"] = f"Must be ₹{rule.amount} per pipeline rule."
+                if (
+                    attrs.get("payment_method") is not None
+                    and rule.payment_method != "Any"
+                    and attrs.get("payment_method") != rule.payment_method
+                ):
+                    errors["payment_method"] = (
+                        f"Must be '{rule.payment_method}' per pipeline rule."
+                    )
+                if errors:
+                    raise serializers.ValidationError(errors)
+                qs = Payment.objects.filter(crm=crm, payment_for=rule.payment_for)
+                if self.instance:
+                    qs = qs.exclude(pk=self.instance.pk)
+                count = qs.count()
+                if count >= rule.cycle_count:
+                    raise serializers.ValidationError(
+                        {"detail": "All cycles completed for this pipeline rule."}
+                    )
+                is_recurring = str(rule.cycle_count) != "1"
+                if is_recurring and count > 0:
+                    last = qs.order_by("-created_at").first()
+                    if last:
+                        from datetime import timedelta
+
+                        next_due = last.created_at.date() + timedelta(
+                            days=rule.cycle_period_days
+                        )
+                        from django.utils import timezone
+
+                        if timezone.now().date() < next_due:
+                            raise serializers.ValidationError(
+                                {
+                                    "detail": f"Next payment due on {next_due.isoformat()}."
+                                }
+                            )
+                if not is_recurring and count > 0:
+                    raise serializers.ValidationError(
+                        {"detail": "One-time pipeline payment already recorded."}
+                    )
+                if not attrs.get("invoice") and not (
+                    self.instance and self.instance.invoice
+                ):
+                    raise serializers.ValidationError(
+                        {
+                            "invoice": "Invoice number required for pipeline rule payment."
+                        }
+                    )
+        return attrs
+
 
 class RecurringScheduleSerializer(serializers.ModelSerializer):
     contact_details = ContactSerializer(source="contact", read_only=True)
