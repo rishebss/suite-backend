@@ -140,6 +140,7 @@ class RecurringScheduleSerializer(serializers.ModelSerializer):
             "completed_cycles",
             "start_date",
             "next_due_date",
+            "due_date",
             "status",
             "remarks",
             "total_amount",

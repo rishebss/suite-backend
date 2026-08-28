@@ -11,6 +11,9 @@ CONTACT_STATUS = (
     ("Inactive", "Inactive"),
     ("Retarget", "Retarget"),
     ("Imports", "Imports"),
+    ("Payment Pending", "Payment Pending"),
+    ("Paid", "Paid"),
+    ("Due", "Due"),
 )
 
 

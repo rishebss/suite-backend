@@ -92,6 +92,9 @@ class RecurringPaymentSchedule(Main):
     completed_cycles = models.PositiveIntegerField(default=0)
     start_date = models.DateField()
     next_due_date = models.DateField(null=True, blank=True)
+    due_date = models.DateField(
+        null=True, blank=True, help_text="Optional due date for single payment"
+    )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="active")
     remarks = models.TextField(blank=True, null=True)
 
