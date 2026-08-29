@@ -65,6 +65,15 @@ DEFAULT_MENUS = [
         "description": "Accounting and financial management",
     },
     {
+        "code": "payments",
+        "name": "Payments",
+        "href": "/payments",
+        "icon": "Wallet",
+        "section": "Operations",
+        "order": 6,
+        "description": "Pipeline payments, schedules & collection logs",
+    },
+    {
         "code": "media",
         "name": "Media",
         "href": "/media",

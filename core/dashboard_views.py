@@ -88,6 +88,8 @@ def overview(request):
 
     # ── Payments ──
     pay_qs = Payment.objects.all()
+    if is_staff_only:
+        pay_qs = pay_qs.filter(crm__assigned_user=user)
     revenue_total = pay_qs.aggregate(v=Sum("amount"))["v"] or 0
     revenue_30 = (
         pay_qs.filter(created_at__gte=thirty_days_ago).aggregate(v=Sum("amount"))["v"]
@@ -116,6 +118,7 @@ def overview(request):
             "payment_for",
             "payment_method",
             "contact__name",
+            "crm__pipeline__name",
             "created_at",
         )
     )
@@ -124,6 +127,52 @@ def overview(request):
         .annotate(count=Count("id"), total=Sum("amount"))
         .order_by("-total")
     )
+    pay_by_pipeline = list(
+        pay_qs.values("crm__pipeline__name")
+        .annotate(total=Sum("amount"), count=Count("id"))
+        .order_by("-total")
+    )
+    from payments.models import RecurringPaymentSchedule
+
+    schedules = RecurringPaymentSchedule.objects.filter(status="active")
+    expected_total = 0
+    for s in schedules:
+        deals = (
+            CRM.objects.filter(pipeline=s.pipeline).count()
+            if not is_staff_only
+            else CRM.objects.filter(pipeline=s.pipeline, assigned_user=user).count()
+        )
+        try:
+            expected_total += float(s.amount) * int(s.cycle_count) * deals
+        except Exception:
+            pass
+    outstanding = max(0, expected_total - float(revenue_total or 0))
+    collection_rate = round(
+        (float(revenue_total) / expected_total * 100) if expected_total else 0, 1
+    )
+
+    crm_by_payment_status = list(
+        crm_qs.values("contact__status").annotate(count=Count("id")).order_by("-count")
+    )
+    pay_pending = next(
+        (
+            x["count"]
+            for x in crm_by_payment_status
+            if x["contact__status"] == "Payment Pending"
+        ),
+        0,
+    )
+    pay_due = next(
+        (x["count"] for x in crm_by_payment_status if x["contact__status"] == "Due"), 0
+    )
+    pay_paid = next(
+        (x["count"] for x in crm_by_payment_status if x["contact__status"] == "Paid"), 0
+    )
+    pay_unpaid = pay_pending + pay_due
+    conversion_contacts_to_deals = round(
+        (deals_total / contacts_total * 100) if contacts_total else 0, 1
+    )
+    avg_deal_value = round(float(pipeline_value) / deals_total, 2) if deals_total else 0
 
     # ── Calendar ──
     cal_qs = CalendarTodo.objects.all()
@@ -209,9 +258,22 @@ def overview(request):
             "payments": {
                 "revenue_total": float(revenue_total),
                 "revenue_30": float(revenue_30),
+                "expected_total": float(expected_total),
+                "outstanding": float(outstanding),
+                "collection_rate": collection_rate,
                 "by_month": pay_by_month,
+                "by_pipeline": pay_by_pipeline,
                 "recent": recent_payments,
                 "by_method": pay_by_method,
+            },
+            "crm_payments": {
+                "by_payment_status": crm_by_payment_status,
+                "pending": pay_pending,
+                "due": pay_due,
+                "paid": pay_paid,
+                "unpaid": pay_unpaid,
+                "conversion_rate": conversion_contacts_to_deals,
+                "avg_deal_value": avg_deal_value,
             },
             "calendar": {
                 "total": cal_total,

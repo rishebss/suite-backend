@@ -1,24 +1,49 @@
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, filters
+from django.db.models import Q
 from payments.models import Payment, RecurringPaymentSchedule
 from payments.serializers import PaymentSerializer, RecurringScheduleSerializer
 
 
 class PaymentViewSet(viewsets.ModelViewSet):
-    queryset = Payment.objects.all().select_related("contact", "crm", "recorded_by")
+    queryset = Payment.objects.all().select_related(
+        "contact", "crm__pipeline", "crm__stage", "recorded_by"
+    )
     serializer_class = PaymentSerializer
     permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = [
+        "contact__name",
+        "payment_for",
+        "invoice",
+        "payment_method",
+        "crm__pipeline__name",
+    ]
+    ordering_fields = ["created_at", "amount"]
+    ordering = ["-created_at"]
 
     def get_queryset(self):
         qs = super().get_queryset()
         contact_id = self.request.query_params.get("contact")
         crm_id = self.request.query_params.get("crm")
         pipeline_id = self.request.query_params.get("pipeline")
+        search = self.request.query_params.get("search")
         if contact_id:
             qs = qs.filter(contact_id=contact_id)
         if crm_id:
             qs = qs.filter(crm_id=crm_id)
         if pipeline_id:
             qs = qs.filter(crm__pipeline_id=pipeline_id)
+        if search:
+            qs = qs.filter(
+                Q(contact__name__icontains=search)
+                | Q(payment_for__icontains=search)
+                | Q(invoice__icontains=search)
+                | Q(payment_method__icontains=search)
+                | Q(crm__pipeline__name__icontains=search)
+            )
+        method = self.request.query_params.get("payment_method")
+        if method:
+            qs = qs.filter(payment_method=method)
         return qs
 
     def perform_create(self, serializer):

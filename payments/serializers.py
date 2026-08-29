@@ -6,6 +6,10 @@ from contacts.serializers import ContactSerializer
 class PaymentSerializer(serializers.ModelSerializer):
     contact_details = ContactSerializer(source="contact", read_only=True)
     recorded_by_details = serializers.SerializerMethodField(read_only=True)
+    crm_details = serializers.SerializerMethodField(read_only=True)
+    pipeline_name = serializers.CharField(
+        source="crm.pipeline.name", read_only=True, default=None
+    )
 
     class Meta:
         model = Payment
@@ -14,6 +18,8 @@ class PaymentSerializer(serializers.ModelSerializer):
             "contact",
             "contact_details",
             "crm",
+            "crm_details",
+            "pipeline_name",
             "recorded_by",
             "recorded_by_details",
             "amount",
@@ -33,6 +39,16 @@ class PaymentSerializer(serializers.ModelSerializer):
                 "first_name": obj.recorded_by.first_name,
                 "last_name": obj.recorded_by.last_name,
                 "email": obj.recorded_by.email,
+            }
+        return None
+
+    def get_crm_details(self, obj):
+        if obj.crm:
+            return {
+                "id": str(obj.crm.id),
+                "pipeline": str(obj.crm.pipeline_id) if obj.crm.pipeline_id else None,
+                "pipeline_name": obj.crm.pipeline.name if obj.crm.pipeline else None,
+                "stage": str(obj.crm.stage_id) if obj.crm.stage_id else None,
             }
         return None
 
