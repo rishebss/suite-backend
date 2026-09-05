@@ -26,6 +26,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
         contact_id = self.request.query_params.get("contact")
         crm_id = self.request.query_params.get("crm")
         pipeline_id = self.request.query_params.get("pipeline")
+        user_id = self.request.query_params.get("recorded_by")
         search = self.request.query_params.get("search")
         if contact_id:
             qs = qs.filter(contact_id=contact_id)
@@ -33,6 +34,8 @@ class PaymentViewSet(viewsets.ModelViewSet):
             qs = qs.filter(crm_id=crm_id)
         if pipeline_id:
             qs = qs.filter(crm__pipeline_id=pipeline_id)
+        if user_id:
+            qs = qs.filter(recorded_by_id=user_id)
         if search:
             qs = qs.filter(
                 Q(contact__name__icontains=search)
@@ -145,8 +148,41 @@ class RecurringScheduleViewSet(viewsets.ModelViewSet):
             qs = qs.filter(contact_id=contact_id)
         return qs
 
+    def _supersede_other_rules(self, pipeline_id, exclude_pk=None):
+        """Enforce one active rule per pipeline: cancel other active
+        pipeline-wide rules on this pipeline. Must run BEFORE saving a new
+        active rule, otherwise the DB unique constraint will reject the save."""
+        qs = RecurringPaymentSchedule.objects.filter(
+            pipeline_id=pipeline_id,
+            status="active",
+            contact__isnull=True,
+        )
+        if exclude_pk:
+            qs = qs.exclude(pk=exclude_pk)
+        return qs.update(status="cancelled")
+
+    def perform_update(self, serializer):
+        from django.db import transaction
+
+        vd = serializer.validated_data
+        obj = serializer.instance
+        will_be_active = vd.get("status", obj.status) == "active"
+        contact_after = vd.get("contact", obj.contact)
+        with transaction.atomic():
+            if will_be_active and obj.pipeline_id and contact_after is None:
+                self._supersede_other_rules(obj.pipeline_id, exclude_pk=obj.pk)
+            obj = serializer.save()
+
     def perform_create(self, serializer):
-        obj = serializer.save(created_by=self.request.user)
+        from django.db import transaction
+
+        vd = serializer.validated_data
+        pipeline = vd.get("pipeline")
+        status_val = vd.get("status", "active")
+        with transaction.atomic():
+            if pipeline and status_val == "active" and vd.get("contact") is None:
+                self._supersede_other_rules(pipeline.pk)
+            obj = serializer.save(created_by=self.request.user)
         if obj.contact_id:
             from contacts.models import ContactLog
 

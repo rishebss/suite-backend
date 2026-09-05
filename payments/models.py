@@ -106,6 +106,15 @@ class RecurringPaymentSchedule(Main):
             models.Index(fields=["contact", "status"]),
             models.Index(fields=["next_due_date"]),
         ]
+        constraints = [
+            # A pipeline can only have one active rule at a time (rules with a
+            # specific contact are excluded — they scope to contact, not pipeline)
+            models.UniqueConstraint(
+                fields=["pipeline"],
+                condition=models.Q(status="active", contact__isnull=True),
+                name="unique_active_pipeline_rule",
+            ),
+        ]
 
     def save(self, *args, **kwargs):
         if not self.next_due_date and self.start_date:
