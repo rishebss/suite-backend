@@ -25,17 +25,19 @@ class PaymentViewSet(viewsets.ModelViewSet):
         qs = super().get_queryset()
         contact_id = self.request.query_params.get("contact")
         crm_id = self.request.query_params.get("crm")
-        pipeline_id = self.request.query_params.get("pipeline")
-        user_id = self.request.query_params.get("recorded_by")
+        pipeline_ids = self.request.query_params.get("pipeline")
+        user_ids = self.request.query_params.get("recorded_by")
         search = self.request.query_params.get("search")
         if contact_id:
             qs = qs.filter(contact_id=contact_id)
         if crm_id:
             qs = qs.filter(crm_id=crm_id)
-        if pipeline_id:
-            qs = qs.filter(crm__pipeline_id=pipeline_id)
-        if user_id:
-            qs = qs.filter(recorded_by_id=user_id)
+        if pipeline_ids:
+            ids = [v for v in pipeline_ids.split(",") if v]
+            qs = qs.filter(crm__pipeline_id__in=ids)
+        if user_ids:
+            ids = [v for v in user_ids.split(",") if v]
+            qs = qs.filter(recorded_by_id__in=ids)
         if search:
             qs = qs.filter(
                 Q(contact__name__icontains=search)
@@ -46,7 +48,8 @@ class PaymentViewSet(viewsets.ModelViewSet):
             )
         method = self.request.query_params.get("payment_method")
         if method:
-            qs = qs.filter(payment_method=method)
+            methods = [m.strip() for m in method.split(",") if m.strip()]
+            qs = qs.filter(payment_method__in=methods)
         return qs
 
     def perform_create(self, serializer):

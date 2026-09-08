@@ -138,6 +138,7 @@ class PaymentSerializer(serializers.ModelSerializer):
 class RecurringScheduleSerializer(serializers.ModelSerializer):
     contact_details = ContactSerializer(source="contact", read_only=True)
     total_amount = serializers.SerializerMethodField()
+    pipeline_name = serializers.SerializerMethodField()
 
     class Meta:
         model = RecurringPaymentSchedule
@@ -147,6 +148,7 @@ class RecurringScheduleSerializer(serializers.ModelSerializer):
             "contact_details",
             "crm",
             "pipeline",
+            "pipeline_name",
             "created_by",
             "amount",
             "payment_for",
@@ -178,6 +180,9 @@ class RecurringScheduleSerializer(serializers.ModelSerializer):
             return float(obj.amount) * int(obj.cycle_count)
         except Exception:
             return 0
+
+    def get_pipeline_name(self, obj):
+        return obj.pipeline.name if obj.pipeline else None
 
     def validate(self, attrs):
         if not attrs.get("pipeline") and not self.instance:
