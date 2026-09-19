@@ -1,0 +1,35 @@
+# Secrets & local state — must never be baked into the image.
+.env
+.env.*
+credentials.txt
+db.sqlite3
+db.sqlite3-journal
+
+# Local virtualenv (deps are installed from requirements.txt in the build).
+venv/
+.venv/
+env/
+
+# Python caches & build artifacts.
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+build/
+dist/
+
+# Collected static / uploaded media are generated at runtime, not shipped.
+staticfiles/
+media_assets/
+media/uploads/
+
+# VCS & editor noise.
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# Misc project clutter.
+*.png
+*.log
