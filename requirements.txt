@@ -8,7 +8,10 @@ django-cors-headers>=4.9.0
 django-filter>=25.2
 django-otp>=1.4.0
 
-# WebSockets
+# WebSockets (Channels). NOTE: the container runs gunicorn (WSGI), which does
+# not serve WebSockets. That's fine — the only WS module (project_management)
+# is not in INSTALLED_APPS. If you enable it later, install daphne and switch
+# the Dockerfile CMD to `daphne core.asgi:application`.
 channels>=4.2.0
 channels-redis>=4.2.0
 
