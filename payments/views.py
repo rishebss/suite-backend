@@ -1,3 +1,5 @@
+from datetime import date
+
 from rest_framework import viewsets, permissions, filters
 from django.db.models import Q, Sum
 from core.pagination import CustomPageNumberPagination
@@ -60,9 +62,17 @@ class PaymentViewSet(viewsets.ModelViewSet):
         crm_id = self.request.query_params.get("crm")
         pipeline_ids = self.request.query_params.get("pipeline")
         user_ids = self.request.query_params.get("recorded_by")
+        date_value = self.request.query_params.get("date")
         search = self.request.query_params.get("search")
         if contact_id:
             qs = qs.filter(contact_id=contact_id)
+        if date_value:
+            # Exact calendar day (the payments table's Date cell). Uses the
+            # project timezone (Asia/Kolkata) since USE_TZ is on.
+            try:
+                qs = qs.filter(created_at__date=date.fromisoformat(date_value))
+            except ValueError:
+                pass
         if crm_id:
             qs = qs.filter(crm_id=crm_id)
         if pipeline_ids:
