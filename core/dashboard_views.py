@@ -1,4 +1,4 @@
-from django.db.models import Count, Sum, Q
+from django.db.models import Count, Min, Sum, Q
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
 from datetime import timedelta
@@ -20,6 +20,7 @@ def overview(request):
     user = request.user
     now = timezone.now()
     thirty_days_ago = now - timedelta(days=30)
+    sixty_days_ago = now - timedelta(days=60)
     seven_days_later = now + timedelta(days=7)
 
     is_staff_only = user.role == "Staff" and not user.is_superuser
@@ -31,6 +32,9 @@ def overview(request):
         contacts_qs.values("status").annotate(count=Count("id")).order_by("-count")
     )
     contacts_new_30 = contacts_qs.filter(created_at__gte=thirty_days_ago).count()
+    contacts_new_30_prev = contacts_qs.filter(
+        created_at__gte=sixty_days_ago, created_at__lt=thirty_days_ago
+    ).count()
 
     # ── Pipelines / Stages ──
     pipelines = Pipeline.objects.annotate(deals_count=Count("deals")).prefetch_related(
@@ -50,16 +54,24 @@ def overview(request):
     deals_total = crm_qs.count()
     deals_unassigned = crm_qs.filter(assigned_user__isnull=True).count()
     deals_assigned = deals_total - deals_unassigned
+    deals_new_30 = crm_qs.filter(created_at__gte=thirty_days_ago).count()
+    deals_new_30_prev = crm_qs.filter(
+        created_at__gte=sixty_days_ago, created_at__lt=thirty_days_ago
+    ).count()
     pipeline_value = crm_qs.aggregate(v=Sum("value"))["v"] or 0
     won_value = crm_qs.filter(stage__slug="won").aggregate(v=Sum("value"))["v"] or 0
     lost_value = crm_qs.filter(stage__slug="lost").aggregate(v=Sum("value"))["v"] or 0
     open_deals = crm_qs.exclude(stage__slug__in=["won", "lost"]).count()
 
-    # deals by stage
+    # deals by stage (ordered by stage position so the frontend can render a funnel)
     by_stage = list(
         crm_qs.values("stage__name", "stage__slug", "stage__color")
-        .annotate(count=Count("id"), value=Sum("value"))
-        .order_by("-count")
+        .annotate(
+            count=Count("id"),
+            value=Sum("value"),
+            stage_order=Min("stage__order"),
+        )
+        .order_by("stage_order", "-count")
     )
     # deals by pipeline
     by_pipeline = list(
@@ -93,6 +105,12 @@ def overview(request):
     revenue_total = pay_qs.aggregate(v=Sum("amount"))["v"] or 0
     revenue_30 = (
         pay_qs.filter(created_at__gte=thirty_days_ago).aggregate(v=Sum("amount"))["v"]
+        or 0
+    )
+    revenue_30_prev = (
+        pay_qs.filter(
+            created_at__gte=sixty_days_ago, created_at__lt=thirty_days_ago
+        ).aggregate(v=Sum("amount"))["v"]
         or 0
     )
     _months = list(
@@ -134,19 +152,34 @@ def overview(request):
     )
     from payments.models import RecurringPaymentSchedule
 
-    schedules = RecurringPaymentSchedule.objects.filter(status="active")
-    expected_total = 0
-    for s in schedules:
-        deals = (
-            CRM.objects.filter(pipeline=s.pipeline).count()
-            if not is_staff_only
-            else CRM.objects.filter(pipeline=s.pipeline, assigned_user=user).count()
+    # Expected revenue = Σ (active rule amount × cycles) × eligible deals per
+    # pipeline. Batched into 2 queries (was one COUNT query per rule), and
+    # lost-stage deals are excluded so "outstanding" isn't inflated by dead
+    # deals that will never pay the remaining cycles.
+    active_rules = list(
+        RecurringPaymentSchedule.objects.filter(status="active").values(
+            "pipeline_id", "amount", "cycle_count"
         )
-        try:
-            expected_total += float(s.amount) * int(s.cycle_count) * deals
-        except Exception:
-            pass
-    outstanding = max(0, expected_total - float(revenue_total or 0))
+    )
+    expected_total = 0.0
+    if active_rules:
+        deals_qs = CRM.objects.filter(
+            pipeline_id__in={r["pipeline_id"] for r in active_rules}
+        ).exclude(stage__slug="lost")
+        if is_staff_only:
+            deals_qs = deals_qs.filter(assigned_user=user)
+        deals_per_pipeline = dict(
+            deals_qs.values("pipeline_id")
+            .annotate(c=Count("id"))
+            .values_list("pipeline_id", "c")
+        )
+        for r in active_rules:
+            expected_total += (
+                float(r["amount"] or 0)
+                * int(r["cycle_count"] or 0)
+                * deals_per_pipeline.get(r["pipeline_id"], 0)
+            )
+    outstanding = max(0.0, expected_total - float(revenue_total or 0))
     collection_rate = round(
         (float(revenue_total) / expected_total * 100) if expected_total else 0, 1
     )
@@ -169,8 +202,17 @@ def overview(request):
         (x["count"] for x in crm_by_payment_status if x["contact__status"] == "Paid"), 0
     )
     pay_unpaid = pay_pending + pay_due
-    conversion_contacts_to_deals = round(
-        (deals_total / contacts_total * 100) if contacts_total else 0, 1
+    # True funnel metric: % of contacts that have at least one deal.
+    # Computed org-wide so numerator and denominator share the same scope
+    # (contacts_total is org-wide — the Contacts module itself is unscoped).
+    contacts_with_deals = (
+        CRM.objects.filter(contact__isnull=False)
+        .values("contact_id")
+        .distinct()
+        .count()
+    )
+    conversion_contacts_to_deals = (
+        round(contacts_with_deals / contacts_total * 100, 1) if contacts_total else 0
     )
     avg_deal_value = round(float(pipeline_value) / deals_total, 2) if deals_total else 0
 
@@ -227,6 +269,21 @@ def overview(request):
             "created_at",
         )
     )
+
+    # ── Period-over-period trends (last 30d vs prior 30d) ──
+    def _trend(current, previous):
+        curr, prev = float(current or 0), float(previous or 0)
+        return {
+            "current": curr,
+            "previous": prev,
+            "delta_pct": round((curr - prev) / prev * 100, 1) if prev else None,
+        }
+
+    trends = {
+        "revenue_30": _trend(revenue_30, revenue_30_prev),
+        "contacts_30": _trend(contacts_new_30, contacts_new_30_prev),
+        "deals_30": _trend(deals_new_30, deals_new_30_prev),
+    }
 
     return Response(
         {
@@ -287,6 +344,7 @@ def overview(request):
             "media": {"assets": media_assets},
             "users": {"total": users_total},
             "recent_activity": recent,
+            "trends": trends,
             "org": {
                 "name": getattr(user.organization, "name", None)
                 if hasattr(user, "organization") and user.organization

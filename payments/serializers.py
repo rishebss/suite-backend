@@ -1,10 +1,12 @@
 from rest_framework import serializers
 from payments.models import Payment, RecurringPaymentSchedule
-from contacts.serializers import ContactSerializer
+from crm.serializers import ContactBriefSerializer
 
 
 class PaymentSerializer(serializers.ModelSerializer):
-    contact_details = ContactSerializer(source="contact", read_only=True)
+    # Brief contact payload: the full ContactSerializer builds a `pipelines`
+    # list with one extra query per row (N+1 across the payment list/drawers).
+    contact_details = ContactBriefSerializer(source="contact", read_only=True)
     recorded_by_details = serializers.SerializerMethodField(read_only=True)
     crm_details = serializers.SerializerMethodField(read_only=True)
     pipeline_name = serializers.CharField(
@@ -136,7 +138,7 @@ class PaymentSerializer(serializers.ModelSerializer):
 
 
 class RecurringScheduleSerializer(serializers.ModelSerializer):
-    contact_details = ContactSerializer(source="contact", read_only=True)
+    contact_details = ContactBriefSerializer(source="contact", read_only=True)
     total_amount = serializers.SerializerMethodField()
     pipeline_name = serializers.SerializerMethodField()
 

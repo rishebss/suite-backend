@@ -1,7 +1,36 @@
 from rest_framework import viewsets, permissions, filters
-from django.db.models import Q
+from django.db.models import Q, Sum
+from core.pagination import CustomPageNumberPagination
 from payments.models import Payment, RecurringPaymentSchedule
 from payments.serializers import PaymentSerializer, RecurringScheduleSerializer
+
+
+class PaymentPageNumberPagination(CustomPageNumberPagination):
+    """Paginated payment list with an opt-in exact total.
+
+    The detail drawers page through the records, so a client-side sum would
+    only cover the loaded rows. `?with_total=1` adds `total_amount` (SUM over
+    the whole filtered queryset) so the collected figures stay exact.
+    """
+
+    def get_paginated_response(self, data):
+        response = super().get_paginated_response(data)
+        if self.request.query_params.get("with_total") in ("1", "true", "yes"):
+            amount = self.page.paginator.object_list.aggregate(total=Sum("amount"))[
+                "total"
+            ]
+            response.data["total_amount"] = str(amount) if amount is not None else "0"
+        return response
+
+
+def _restricted_to_own_deals(user):
+    """Staff only see payments/rules for deals they are assigned to.
+    Superadmins/Admins (and Django superusers) see everything."""
+    return (
+        getattr(user, "is_authenticated", False)
+        and getattr(user, "role", None) == "Staff"
+        and not getattr(user, "is_superuser", False)
+    )
 
 
 class PaymentViewSet(viewsets.ModelViewSet):
@@ -9,6 +38,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
         "contact", "crm__pipeline", "crm__stage", "recorded_by"
     )
     serializer_class = PaymentSerializer
+    pagination_class = PaymentPageNumberPagination
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = [
@@ -23,6 +53,9 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        # Staff can only see payments recorded against deals assigned to them.
+        if _restricted_to_own_deals(self.request.user):
+            qs = qs.filter(crm__assigned_user=self.request.user)
         contact_id = self.request.query_params.get("contact")
         crm_id = self.request.query_params.get("crm")
         pipeline_ids = self.request.query_params.get("pipeline")
@@ -39,13 +72,34 @@ class PaymentViewSet(viewsets.ModelViewSet):
             ids = [v for v in user_ids.split(",") if v]
             qs = qs.filter(recorded_by_id__in=ids)
         if search:
-            qs = qs.filter(
-                Q(contact__name__icontains=search)
-                | Q(payment_for__icontains=search)
-                | Q(invoice__icontains=search)
-                | Q(payment_method__icontains=search)
-                | Q(crm__pipeline__name__icontains=search)
-            )
+            search_field = self.request.query_params.get("search_field")
+            if search_field:
+                field_map = {
+                    "contact": "contact__name__icontains",
+                    "payment_for": "payment_for__icontains",
+                    "invoice": "invoice__icontains",
+                    "method": "payment_method__icontains",
+                    "pipeline": "crm__pipeline__name__icontains",
+                }
+                lookup = field_map.get(search_field)
+                if lookup:
+                    qs = qs.filter(**{lookup: search})
+                else:
+                    qs = qs.filter(
+                        Q(contact__name__icontains=search)
+                        | Q(payment_for__icontains=search)
+                        | Q(invoice__icontains=search)
+                        | Q(payment_method__icontains=search)
+                        | Q(crm__pipeline__name__icontains=search)
+                    )
+            else:
+                qs = qs.filter(
+                    Q(contact__name__icontains=search)
+                    | Q(payment_for__icontains=search)
+                    | Q(invoice__icontains=search)
+                    | Q(payment_method__icontains=search)
+                    | Q(crm__pipeline__name__icontains=search)
+                )
         method = self.request.query_params.get("payment_method")
         if method:
             methods = [m.strip() for m in method.split(",") if m.strip()]
@@ -143,6 +197,11 @@ class RecurringScheduleViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        # Staff only see rules for pipelines whose departments they belong to.
+        if _restricted_to_own_deals(self.request.user):
+            qs = qs.filter(
+                pipeline__departments__in=self.request.user.departments.all()
+            ).distinct()
         pipeline_id = self.request.query_params.get("pipeline")
         contact_id = self.request.query_params.get("contact")
         if pipeline_id:

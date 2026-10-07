@@ -385,6 +385,7 @@ class CRMViewSet(viewsets.ModelViewSet):
         stages = self.request.query_params.get("stages")
         pipeline_id = self.request.query_params.get("pipeline")
         assigned_user_id = self.request.query_params.get("assigned_user")
+        contact_id = self.request.query_params.get("contact")
         search = self.request.query_params.get("search")
         exclude_ids = self.request.query_params.get("exclude_ids")
         exclude_pipeline_id = self.request.query_params.get("exclude_pipeline_id")
@@ -414,6 +415,8 @@ class CRMViewSet(viewsets.ModelViewSet):
             qs = qs.filter(pipeline_id=pipeline_id)
         if assigned_user_id:
             qs = qs.filter(assigned_user_id=assigned_user_id)
+        if contact_id:
+            qs = qs.filter(contact_id=contact_id)
         if search:
             from django.db.models import Q
 
